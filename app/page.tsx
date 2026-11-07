@@ -10,3 +10,5 @@ export default function Page() {
   }, [router]);
   return null;
 }
+
+// Yair was here
