@@ -88,7 +88,8 @@ export default function Dashboard() {
   }, [saveDb, showToast]);
 
   const handleNewTask = () => router.push("/tasks/nueva");
-  const handleEditTask = (id: string) => router.push(`/tasks/${id}/editar`);
+  const handleEditTask = (id: string) =>
+    router.push(`/tasks/editar?id=${encodeURIComponent(id)}`);
 
   return (
     <div className="w-full max-w-[1080px] mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-6 fade-in">

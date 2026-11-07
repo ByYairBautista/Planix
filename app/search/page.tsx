@@ -22,7 +22,7 @@ export default function SearchPage() {
     const r: Array<{ type: string; title: string; subtitle: string; id: string; onClick: () => void }> = [];
     tasks.forEach((t) => {
       if ((t.title || "").toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q) || (Array.isArray(t.tags) ? t.tags : []).some((tag) => (tag || "").toLowerCase().includes(q))) {
-        r.push({ type: "tarea", title: t.title, subtitle: t.description || "Sin descripción", id: t.id, onClick: () => router.push(`/tasks/${t.id}/editar`) });
+        r.push({ type: "tarea", title: t.title, subtitle: t.description || "Sin descripción", id: t.id, onClick: () => router.push(`/tasks/editar?id=${encodeURIComponent(t.id)}`) });
       }
     });
     reminders.forEach((r_) => {

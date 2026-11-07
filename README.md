@@ -43,6 +43,16 @@ Al entrar se accede directamente al dashboard (sin pantalla de login). Los datos
 
 Para instalar Planix, abre **Configuración → Instalar aplicación** desde un navegador compatible y sigue la solicitud o las instrucciones que aparezcan. La instalación web requiere HTTPS en producción; en iPhone/iPad se realiza desde **Compartir → Añadir a pantalla de inicio** en Safari.
 
+## Publicar en GitHub Pages
+
+El proyecto exporta un sitio estático en `out/` y se publica con el workflow `.github/workflows/deploy.yml`. El workflow usa automáticamente el nombre del repositorio como subruta (por ejemplo, `/Planix`) y despliega al hacer push a `main` o `master`.
+
+1. En GitHub, abre **Settings → Pages** y selecciona **GitHub Actions** como fuente de publicación.
+2. Sube los cambios a `main` o `master`, o ejecuta manualmente el workflow **Deploy to GitHub Pages** en la pestaña **Actions**.
+3. La URL del proyecto será `https://<usuario>.github.io/Planix/`.
+
+Para comprobar la exportación localmente, ejecuta `npm run build`; el sitio generado queda en `out/`. Las alarmas y recordatorios siguen requiriendo que la app esté abierta.
+
 ## Notas importantes sobre alarmas y recordatorios web
 
 Esta es una aplicación web. Las alarmas y los recordatorios se supervisan mientras Planix está abierta. Las alarmas usan Web Audio API y los recordatorios usan notificaciones del navegador cuando tienen permiso; si no, muestran un aviso dentro de Planix. **No se garantiza que suenen o notifiquen con la aplicación cerrada o el dispositivo bloqueado** (limitación del navegador). En una versión móvil (React Native/Expo) se usarían notificaciones locales y APIs nativas de alarmas.

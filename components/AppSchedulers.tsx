@@ -8,6 +8,7 @@ import { notifyToast } from "@/components/Toast";
 import { Button } from "@/components/ui";
 import type { Alarm, Reminder } from "@/lib/types";
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const REMINDER_NOTICE_KEY = "planix_notified_reminders";
 
 function nextAlarmTrigger(alarm: Alarm, after: number) {
@@ -41,7 +42,7 @@ function sendReminderNotice(title: string, body: string, notificationsEnabled: b
   if (!notificationsEnabled) return;
   if ("Notification" in window && Notification.permission === "granted") {
     try {
-      new Notification(title, { body, icon: "/icons/icon-192.png" });
+      new Notification(title, { body, icon: `${basePath}/icons/icon-192.png` });
       return;
     } catch (error) {
       console.error("No se pudo mostrar la notificación del navegador.", error);
