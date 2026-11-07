@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "@/lib/providers";
 import { generateId } from "@/lib/storage";
 import { nowIso } from "@/lib/date-utils";
-import { Dialog, Button, Input, Textarea, Label, Checkbox, Select, Badge } from "@/components/ui";
+import { Dialog, Button, Input, Textarea, Label, Checkbox, Select } from "@/components/ui";
+import type { TaskRepeat } from "@/lib/types";
 
 type Mode = "create" | "edit";
 
@@ -26,6 +27,10 @@ const REPEATS = [
   { label: "Mensual", value: "mensual" },
 ];
 
+function isTaskRepeat(value: string): value is TaskRepeat {
+  return REPEATS.some((repeat) => repeat.value === value);
+}
+
 export function TaskFormModal({ open, onClose, mode, taskId, onSuccess }: TaskFormModalProps) {
   const { db, user, saveDb } = useApp();
   const [subtasks, setSubtasks] = useState<{ id: string; title: string; completed: boolean }[]>([]);
@@ -38,8 +43,10 @@ export function TaskFormModal({ open, onClose, mode, taskId, onSuccess }: TaskFo
   const [tags, setTags] = useState("");
   const [notes, setNotes] = useState("");
   const [favorite, setFavorite] = useState(false);
-  const [repeat, setRepeat] = useState<"none" | "diaria" | "semanal" | "mensual" | "personalizada">("none");
+  const [repeat, setRepeat] = useState<TaskRepeat>("none");
 
+  // Populate the editor from the selected task whenever it opens.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && taskId) {
@@ -54,11 +61,16 @@ export function TaskFormModal({ open, onClose, mode, taskId, onSuccess }: TaskFo
       setPriority("media"); setCategoryId(""); setTags(""); setNotes(""); setFavorite(false); setRepeat("none"); setSubtasks([]);
     }
   }, [open, mode, taskId, db]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const categories = db.categories.filter((c) => c.userId === user.id);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (repeat !== "none" && !dueDate) {
+      window.alert("Selecciona una fecha para crear una tarea recurrente.");
+      return;
+    }
     const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
     const now = nowIso();
     const resolvedId = mode === "edit" && taskId ? taskId : generateId("task");
@@ -68,7 +80,8 @@ export function TaskFormModal({ open, onClose, mode, taskId, onSuccess }: TaskFo
       dueDate: dueDate || null, dueTime: dueTime || null, priority, completed: mode === "edit" ? existing?.completed ?? false : false,
       completedAt: null, favorite, tags: tagList, notes,
       subtasks: subtasks.map((s) => ({ id: s.id || generateId("st"), taskId: resolvedId, title: s.title, completed: s.completed })),
-      repeat, repeatConfig: null, createdAt: mode === "edit" ? existing?.createdAt ?? now : now, updatedAt: now,
+      repeat, repeatConfig: repeat === existing?.repeat ? existing.repeatConfig : null,
+      createdAt: mode === "edit" ? existing?.createdAt ?? now : now, updatedAt: now,
     };
     saveDb((d) => {
       const next = { ...d };
@@ -109,7 +122,9 @@ export function TaskFormModal({ open, onClose, mode, taskId, onSuccess }: TaskFo
 
         <div className="flex items-center gap-3"><Checkbox checked={favorite} onChange={setFavorite} label="Marcar como favorita" /></div>
 
-        <div><Label>Repetir</Label><Select value={repeat} onChange={(v) => setRepeat(v as any)} options={REPEATS.map(r => ({ label: r.label, value: r.value }))} /></div>
+        <div><Label>Repetir</Label><Select value={repeat} onChange={(value) => {
+          if (isTaskRepeat(value)) setRepeat(value);
+        }} options={REPEATS.map((r) => ({ label: r.label, value: r.value }))} /></div>
 
         <div><Label>Subtareas</Label><div className="space-y-2">{subtasks.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2"><input type="text" value={s.title} onChange={(e) => { const n = [...subtasks]; n[i] = { ...n[i], title: e.target.value }; setSubtasks(n); }} className="flex-1 input text-sm" placeholder="Subtarea..." /><button type="button" onClick={() => setSubtasks(subtasks.filter((_, j) => j !== i))} className="text-[var(--color-text-muted)] hover:text-[var(--color-alert)] p-1" title="Eliminar"><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 18L18 6M6 6l12 12" /></svg></button></div>

@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/providers";
-import { isPastDue, formatDate, formatTime, formatRelative, formatTaskTime, datePart, nowIso, todayStr, LOCALE } from "@/lib/date-utils";
+import { toggleTaskCompletion } from "@/lib/storage";
+import { isPastDue, formatRelative, formatTaskTime, datePart, todayStr, LOCALE } from "@/lib/date-utils";
 import { Card, Button, Badge, StatBadge } from "@/components/ui";
 import FAB from "@/components/FAB";
 import EmptyState from "@/components/EmptyState";
@@ -76,7 +77,7 @@ export default function Dashboard() {
   const toggleTask = useCallback((id: string) => {
     const t = db.tasks.find((x) => x.id === id);
     const next = !t?.completed;
-    saveDb((d) => ({ ...d, tasks: d.tasks.map((x) => x.id === id ? { ...x, completed: next, completedAt: next ? nowIso() : null, updatedAt: nowIso() } : x) }));
+    saveDb((d) => toggleTaskCompletion(d, id));
     showToast(next ? "Tarea completada ✓" : "Tarea reabierta");
   }, [db, saveDb, showToast]);
 
@@ -183,7 +184,7 @@ export default function Dashboard() {
                         <span className={`block text-sm font-semibold truncate ${t.completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text)]"}`}>{t.title}</span>
                         {t.description && <span className="block text-[12px] text-[var(--color-text-secondary)] truncate mt-0.5">{t.description}</span>}
                         <span className="flex flex-wrap items-center gap-1.5 mt-2">
-                          <Badge variant={t.priority as any}>{capitalize(t.priority)}</Badge>
+                          <Badge variant={t.priority}>{capitalize(t.priority)}</Badge>
                           {overdueT && <Badge variant="alert">Atrasada</Badge>}
                           {cat && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--color-text-secondary)]"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.color }} />{cat.name}</span>}
                         </span>

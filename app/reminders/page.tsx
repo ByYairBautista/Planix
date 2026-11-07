@@ -1,22 +1,34 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/providers";
 import { generateId } from "@/lib/storage";
-import { nowIso, formatRelative, formatTime } from "@/lib/date-utils";
+import { nowIso, formatRelative, formatTime, nextReminderOccurrence } from "@/lib/date-utils";
 import { Card, Button, Input, Badge, Label, Select } from "@/components/ui";
 import { Dialog } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import FAB from "@/components/FAB";
+import type { ReminderRepeat } from "@/lib/types";
+
+const REPEATS: { label: string; value: ReminderRepeat }[] = [
+  { label: "Ninguna", value: "none" },
+  { label: "Diario", value: "diaria" },
+  { label: "Semanal", value: "semanal" },
+  { label: "Mensual", value: "mensual" },
+];
 
 export default function RemindersPage() {
   const { db, user, saveDb } = useApp();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const reminders = useMemo(() => db.reminders.filter((r) => r.userId === user.id), [db, user.id]);
   const tasks = db.tasks.filter((t) => t.userId === user.id);
@@ -36,7 +48,21 @@ export default function RemindersPage() {
   const closeModal = useCallback(() => { setOpen(false); setEditId(null); }, []);
 
   const markAttended = useCallback((id: string) => {
-    saveDb((d) => ({ ...d, reminders: d.reminders.map((r) => r.id === id ? { ...r, attended: true, attendedAt: nowIso() } : r) }));
+    saveDb((d) => ({
+      ...d,
+      reminders: d.reminders.map((r) => {
+        if (r.id !== id) return r;
+        if (r.repeat !== "none") {
+          return {
+            ...r,
+            datetime: nextReminderOccurrence(r.datetime, r.repeat, r.repeatConfig?.dayOfMonth),
+            attended: false,
+            attendedAt: nowIso(),
+          };
+        }
+        return { ...r, attended: true, attendedAt: nowIso() };
+      }),
+    }));
     showToast("Recordatorio marcado como atendido", "success");
   }, [saveDb, showToast]);
 
@@ -55,8 +81,27 @@ export default function RemindersPage() {
     showToast(`Pospuesto ${minutes} min`, "success");
   }, [saveDb, showToast]);
 
-  const handleSave = useCallback((data: { title: string; description: string; datetime: string; anticipation: number; repeat: string; taskId: string | null; }) => {
-    const reminder = { id: editId || generateId("rem"), userId: user.id, taskId: data.taskId, title: data.title, description: data.description, datetime: data.datetime, anticipation: data.anticipation, repeat: data.repeat as any, attended: false, attendedAt: null, createdAt: editId ? db.reminders.find((r) => r.id === editId)?.createdAt ?? nowIso() : nowIso() };
+  const handleSave = useCallback((data: { title: string; description: string; datetime: string; anticipation: number; repeat: ReminderRepeat; taskId: string | null; }) => {
+    const existing = editId ? db.reminders.find((r) => r.id === editId) : undefined;
+    const reminderDate = new Date(data.datetime);
+    const reminder = {
+      id: editId || generateId("rem"),
+      userId: user.id,
+      taskId: data.taskId,
+      title: data.title,
+      description: data.description,
+      datetime: reminderDate.toISOString(),
+      anticipation: data.anticipation,
+      repeat: data.repeat,
+      repeatConfig: data.repeat !== "mensual"
+        ? null
+        : existing?.repeat === "mensual" && existing.repeatConfig
+          ? existing.repeatConfig
+          : { dayOfMonth: reminderDate.getDate() },
+      attended: false,
+      attendedAt: null,
+      createdAt: existing?.createdAt ?? nowIso(),
+    };
     saveDb((d) => { const next = { ...d }; if (editId) next.reminders = next.reminders.map((r) => r.id === editId ? reminder : r); else next.reminders = [reminder, ...next.reminders]; return next; });
     setOpen(false); setEditId(null); showToast(editId ? "Recordatorio actualizado" : "Recordatorio creado", "success");
   }, [editId, user.id, db, saveDb, showToast]);
@@ -81,7 +126,6 @@ export default function RemindersPage() {
         ) : (
           filtered.map((r) => {
             const task = tasks.find((t) => t.id === r.taskId);
-            const now = Date.now();
             const passed = new Date(r.datetime).getTime() < now && !r.attended;
             return (
               <Card key={r.id} className="p-4 flex items-start gap-3 border-l-4" style={{ borderLeftColor: passed ? "var(--color-alert)" : "var(--color-accent)" }}>
@@ -127,15 +171,17 @@ function toLocalInput(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function ReminderFormModal({ open, onClose, editId, onSave }: { open: boolean; onClose: () => void; editId: string | null; onSave: (data: { title: string; description: string; datetime: string; anticipation: number; repeat: string; taskId: string | null; }) => void; }) {
+function ReminderFormModal({ open, onClose, editId, onSave }: { open: boolean; onClose: () => void; editId: string | null; onSave: (data: { title: string; description: string; datetime: string; anticipation: number; repeat: ReminderRepeat; taskId: string | null; }) => void; }) {
   const { db, user } = useApp();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [datetime, setDatetime] = useState("");
   const [anticipation, setAnticipation] = useState(10);
-  const [repeat, setRepeat] = useState("none");
+  const [repeat, setRepeat] = useState<ReminderRepeat>("none");
   const [taskId, setTaskId] = useState<string | null>(null);
 
+  // Populate the editor from the selected reminder whenever it opens.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
     if (editId) {
@@ -145,12 +191,9 @@ function ReminderFormModal({ open, onClose, editId, onSave }: { open: boolean; o
       setTitle(""); setDescription(""); setDatetime(""); setAnticipation(10); setRepeat("none"); setTaskId(null);
     }
   }, [open, editId, db]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const ANTICIPATIONS = [0, 5, 10, 15, 30, 60, 120];
-  const REPEATS = [
-    { label: "Ninguna", value: "none" }, { label: "Diario", value: "diaria" },
-    { label: "Semanal", value: "semanal" }, { label: "Mensual", value: "mensual" },
-  ];
   const tasks = db.tasks.filter((t) => t.userId === user.id);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -170,7 +213,10 @@ function ReminderFormModal({ open, onClose, editId, onSave }: { open: boolean; o
         <div><Label>Descripción</Label><Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" /></div>
         <div><Label>Fecha y hora</Label><Input type="datetime-local" value={datetime} onChange={(e) => setDatetime(e.target.value)} required /></div>
         <div><Label>Anticipación del aviso</Label><Select value={anticipation.toString()} onChange={(v) => setAnticipation(Number(v))} options={ANTICIPATIONS.map((a) => ({ label: a === 0 ? "Al momento" : `${a} min antes`, value: a.toString() }))} /></div>
-        <div><Label>Repetición</Label><Select value={repeat} onChange={setRepeat} options={REPEATS.map(r => ({ label: r.label, value: r.value }))} /></div>
+        <div><Label>Repetición</Label><Select value={repeat} onChange={(value) => {
+          const option = REPEATS.find((item) => item.value === value);
+          if (option) setRepeat(option.value);
+        }} options={REPEATS} /></div>
         <div><Label>Asociar a una tarea (opcional)</Label><Select value={taskId || ""} onChange={(v) => setTaskId(v || null)} options={[{ label: "Ninguna", value: "" }, ...tasks.map((t) => ({ label: t.title, value: t.id }))]} /></div>
 
         <div className="pt-4 border-t border-[var(--color-border)] flex justify-end gap-3">

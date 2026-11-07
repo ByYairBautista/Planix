@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/providers";
 import { generateId } from "@/lib/storage";
 import { nowIso, todayStr, getMonthDates, getWeekDates, formatDate, datePart, formatTaskTime } from "@/lib/date-utils";
@@ -9,7 +8,7 @@ import { Card, Button, Input, Badge, Label, Select } from "@/components/ui";
 import { Dialog } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 import FAB from "@/components/FAB";
-import type { Task, Reminder } from "@/lib/types";
+import type { Task, Reminder, Alarm, Priority } from "@/lib/types";
 
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const WEEKDAYS_MON = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -19,9 +18,12 @@ function localDay(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function isPriority(value: string): value is Priority {
+  return value === "baja" || value === "media" || value === "alta" || value === "urgente";
+}
+
 export default function CalendarPage() {
   const { db, user, saveDb, preferences } = useApp();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | null>(null);
   const [todayIso, setTodayIso] = useState("");
@@ -29,7 +31,10 @@ export default function CalendarPage() {
   const [view, setView] = useState<"mes" | "semana" | "dia">("mes");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // Initialize the date-dependent calendar only after hydration.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { const d = new Date(); setCalendarDate(d); setTodayIso(todayStr()); setSelectedDate(todayStr()); }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const tasks = db.tasks.filter((t) => t.userId === user.id);
   const reminders = db.reminders.filter((r) => r.userId === user.id);
@@ -58,9 +63,9 @@ export default function CalendarPage() {
   const nextMonth = () => { if (!calendarDate) return; setCalendarDate(new Date(year, month + 1, 1)); };
   const shiftDays = (n: number) => { if (!calendarDate) return; const d = new Date(calendarDate); d.setDate(d.getDate() + n); setCalendarDate(d); setSelectedDate(localDay(d)); };
 
-  const handleSaveActivity = useCallback((data: { title: string; description: string; date: string; time: string; type: "task" | "reminder"; priority: string; }) => {
+  const handleSaveActivity = useCallback((data: { title: string; description: string; date: string; time: string; type: "task" | "reminder"; priority: Priority; }) => {
     if (data.type === "task") {
-      const task: Task = { id: generateId("task"), userId: user.id, categoryId: null, title: data.title, description: data.description, dueDate: data.date, dueTime: data.time || null, priority: data.priority as any, completed: false, completedAt: null, favorite: false, tags: [], notes: "", subtasks: [], repeat: "none", repeatConfig: null, createdAt: nowIso(), updatedAt: nowIso() };
+      const task: Task = { id: generateId("task"), userId: user.id, categoryId: null, title: data.title, description: data.description, dueDate: data.date, dueTime: data.time || null, priority: data.priority, completed: false, completedAt: null, favorite: false, tags: [], notes: "", subtasks: [], repeat: "none", repeatConfig: null, createdAt: nowIso(), updatedAt: nowIso() };
       saveDb((d) => ({ ...d, tasks: [task, ...d.tasks] }));
       showToast("Tarea creada desde el calendario", "success");
     } else {
@@ -179,7 +184,7 @@ export default function CalendarPage() {
   );
 }
 
-function DayPanel({ selectedDate, tasks, reminders, alarms, onNew, wide = false }: { selectedDate: string; tasks: Task[]; reminders: Reminder[]; alarms: any[]; onNew: () => void; wide?: boolean }) {
+function DayPanel({ selectedDate, tasks, reminders, alarms, onNew, wide = false }: { selectedDate: string; tasks: Task[]; reminders: Reminder[]; alarms: Alarm[]; onNew: () => void; wide?: boolean }) {
   const [y, m, d] = selectedDate.split("-").map(Number);
   const dateObj = new Date(y, (m || 1) - 1, d || 1);
   const dayTasks = tasks.filter((t) => datePart(t.dueDate) === selectedDate).sort((a, b) => (a.dueTime || "23:59").localeCompare(b.dueTime || "23:59"));
@@ -212,7 +217,7 @@ function DayPanel({ selectedDate, tasks, reminders, alarms, onNew, wide = false 
                         <span className={`block text-sm font-semibold truncate ${t.completed ? "line-through text-[var(--color-text-muted)]" : ""}`}>{t.title}</span>
                         {t.dueTime && <span className="block text-[11px] font-mono text-[var(--color-text-secondary)]">{formatTaskTime(t.dueDate, t.dueTime, 24)}</span>}
                       </span>
-                      <Badge variant={t.priority as any} className="text-[10px] shrink-0">{t.priority}</Badge>
+                      <Badge variant={t.priority} className="text-[10px] shrink-0">{t.priority}</Badge>
                     </li>
                   ))}
                 </ul>
@@ -259,19 +264,22 @@ function DayPanel({ selectedDate, tasks, reminders, alarms, onNew, wide = false 
   );
 }
 
-function ActivityFormModal({ open, onClose, onSave, initialDate }: { open: boolean; onClose: () => void; onSave: (data: { title: string; description: string; date: string; time: string; type: "task" | "reminder"; priority: string; }) => void; initialDate: string }) {
+function ActivityFormModal({ open, onClose, onSave, initialDate }: { open: boolean; onClose: () => void; onSave: (data: { title: string; description: string; date: string; time: string; type: "task" | "reminder"; priority: Priority; }) => void; initialDate: string }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("09:00");
   const [type, setType] = useState<"task" | "reminder">("task");
-  const [priority, setPriority] = useState("media");
+  const [priority, setPriority] = useState<Priority>("media");
 
+  // Reset the form each time the create dialog is opened.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setTitle(""); setDescription(""); setDate(initialDate || todayStr()); setTime("09:00"); setType("task"); setPriority("media");
     }
   }, [open, initialDate]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title) return; onSave({ title, description, date, time, type, priority }); };
 
@@ -294,7 +302,9 @@ function ActivityFormModal({ open, onClose, onSave, initialDate }: { open: boole
           "flex-1 py-2.5 rounded-[var(--radius-sm)] border text-sm font-medium transition-all",
           type === "reminder" ? "bg-[var(--color-accent)] border-[var(--color-accent)] text-white" : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]",
         ].filter(Boolean).join(" ")}>Recordatorio</button></div></div>
-        {type === "task" && (<div><Label>Prioridad</Label><Select value={priority} onChange={setPriority} options={[{ label: "Baja", value: "baja" }, { label: "Media", value: "media" }, { label: "Alta", value: "alta" }, { label: "Urgente", value: "urgente" }]} /></div>)}
+        {type === "task" && (<div><Label>Prioridad</Label><Select value={priority} onChange={(value) => {
+          if (isPriority(value)) setPriority(value);
+        }} options={[{ label: "Baja", value: "baja" }, { label: "Media", value: "media" }, { label: "Alta", value: "alta" }, { label: "Urgente", value: "urgente" }]} /></div>)}
         <div className="pt-4 border-t border-[var(--color-border)] flex justify-end gap-3">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button variant="primary" type="submit">Crear {type === "task" ? "tarea" : "recordatorio"}</Button>

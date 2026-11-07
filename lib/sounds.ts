@@ -3,14 +3,21 @@
 /*  The alarm loops continuously until stopAllSounds() is called.     */
 /* ------------------------------------------------------------------ */
 
+import type { AlarmSound } from "@/lib/types";
+
 let audioCtx: AudioContext | null = null;
 let loopActive = false;
 let loopTimer: ReturnType<typeof setTimeout> | null = null;
+let durationTimer: ReturnType<typeof setTimeout> | null = null;
 const activeOscs = new Set<OscillatorNode>();
 
 function getCtx() {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextConstructor =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) throw new Error("Web Audio API no está disponible.");
+    audioCtx = new AudioContextConstructor();
   }
   if (audioCtx.state === "suspended") {
     void audioCtx.resume();
@@ -40,7 +47,7 @@ function playChord(freqs: number[], duration: number, volume = 0.2, delay = 0) {
 }
 
 /** Plays one full sequence. Returns its duration in milliseconds. */
-function playSequence(sound: string, volume: number): number {
+function playSequence(sound: AlarmSound, volume: number): number {
   if (sound === "classic") {
     // Repeating two-note alert
     for (let i = 0; i < 6; i++) {
@@ -73,16 +80,30 @@ function playSequence(sound: string, volume: number): number {
  * Starts the alarm sound and keeps looping it until stopAllSounds()
  * is called (from "Detener" or "Posponer" on the active-alarm overlay).
  */
-export function playAlarmSound(sound: string, volume: number) {
+export function playAlarmSound(
+  sound: AlarmSound,
+  volume: number,
+  durationSeconds: number,
+  repeatCount: number,
+) {
   const v = Math.max(0, Math.min(1, volume));
+  const maxDuration = Number.isFinite(durationSeconds) ? Math.max(1, durationSeconds) : 60;
+  const maxRepeats = Number.isFinite(repeatCount) ? Math.max(1, Math.floor(repeatCount)) : 1;
   stopAllSounds();
   loopActive = true;
+  let repeatsLeft = maxRepeats;
   const loop = () => {
     if (!loopActive) return;
+    if (repeatsLeft <= 0) {
+      stopAllSounds();
+      return;
+    }
+    repeatsLeft -= 1;
     const durationMs = playSequence(sound, v);
     loopTimer = setTimeout(loop, durationMs + 400);
   };
   loop();
+  durationTimer = setTimeout(stopAllSounds, maxDuration * 1000);
 }
 
 export function stopAllSounds() {
@@ -90,6 +111,10 @@ export function stopAllSounds() {
   if (loopTimer) {
     clearTimeout(loopTimer);
     loopTimer = null;
+  }
+  if (durationTimer) {
+    clearTimeout(durationTimer);
+    durationTimer = null;
   }
   activeOscs.forEach((osc) => {
     try { osc.stop(); } catch { /* already stopped */ }
@@ -108,6 +133,6 @@ export async function requestAudio() {
     const ctx = getCtx();
     if (ctx.state === "suspended") await ctx.resume();
   } catch {
-    // audio not available
+    console.error("No se pudo activar el audio del navegador.");
   }
 }

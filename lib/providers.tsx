@@ -23,24 +23,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [db, setDbState] = useState<DbData | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Load browser-persisted data only after hydration to avoid server/client markup differences.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const d = getDb();
     setDbState(d);
     setReady(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const current = db ?? seed;
   const userId = demoUserId();
   const user = current.user;
   const preferences = current.preferences;
 
-  const [theme, setThemeState] = useState<Theme>(user.theme || "light");
-
-  // Restaura el tema guardado cuando la BD cargada desde localStorage llega
-  useEffect(() => {
-    if (ready && user.theme) setThemeState(user.theme);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+  const theme: Theme = user.theme || "light";
 
   useEffect(() => {
     const root = document.documentElement;
@@ -58,7 +55,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [current, persist]);
 
   const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
     saveDb((d) => ({ ...d, user: { ...d.user, theme: t } }));
   }, [saveDb]);
 

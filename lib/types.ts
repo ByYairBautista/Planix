@@ -73,6 +73,7 @@ export interface Reminder {
   datetime: string; // ISO
   anticipation: number; // minutes before
   repeat: ReminderRepeat;
+  repeatConfig?: { dayOfMonth?: number } | null;
   attended: boolean;
   attendedAt: string | null;
   createdAt: string;

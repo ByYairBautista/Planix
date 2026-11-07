@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/providers";
-import { Card, Button, Badge, Input } from "@/components/ui";
+import { Card, Badge, Input } from "@/components/ui";
 import EmptyState from "@/components/EmptyState";
 
 export default function SearchPage() {

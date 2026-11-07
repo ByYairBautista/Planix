@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 
 export function Button({
   children, className = "", variant = "primary", size = "md",
@@ -36,11 +37,13 @@ export function Badge({ children, className = "", variant = "neutral" }: { child
   return <span className={["badge capitalize", map[variant] || map.neutral, className].filter(Boolean).join(" ")}>{children}</span>;
 }
 
-export function Card({ children, className = "", padding = "p-5", ...props }: any) {
+export function Card({ children, className = "", padding = "p-5", ...props }: React.HTMLAttributes<HTMLDivElement> & { padding?: string }) {
   return <div className={["card", padding, className].filter(Boolean).join(" ")} {...props}>{children}</div>;
 }
 
-export function Label({ children, ...props }: any) { return <label className="label" {...props}>{children}</label>; }
+export function Label({ children, className = "", ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
+  return <label className={["label", className].filter(Boolean).join(" ")} {...props}>{children}</label>;
+}
 
 export function Checkbox({ checked, onChange, className = "", label }: { checked: boolean; onChange: (b: boolean) => void; className?: string; label?: string }) {
   return (
@@ -54,6 +57,7 @@ export function Checkbox({ checked, onChange, className = "", label }: { checked
 export function Switch({ checked, onChange, className = "" }: { checked: boolean; onChange: (b: boolean) => void; className?: string }) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!checked)}
       className={["relative inline-block shrink-0 cursor-pointer select-none rounded-full border transition-all duration-300", checked ? "bg-[var(--color-accent)] border-[var(--color-accent)]" : "bg-[var(--color-surface-hover)] border-[var(--color-border)]", className].filter(Boolean).join(" ")}
       aria-checked={checked} role="switch" style={{ width: 46, height: 26 }}
@@ -89,7 +93,7 @@ export function Dialog({ open, onClose, children, className = "" }: { open: bool
   );
 }
 
-export function Toast({ id, message, type = "success", onClose }: { id: string; message: string; type?: "success" | "error" | "info"; onClose: () => void }) {
+export function Toast({ message, type = "success", onClose }: { message: string; type?: "success" | "error" | "info"; onClose: () => void }) {
   const colors: Record<string, string> = {
     success: "bg-[var(--color-success-light)] text-[#22755a] dark:text-[#7adbb2]",
     error: "bg-[var(--color-alert-light)] text-[#b8364a] dark:text-[#f49dab]",
@@ -122,7 +126,7 @@ export function Avatar({ src, size = "w-8 h-8", fallback, className = "" }: { sr
   return (
     <div className={["relative shrink-0", className].filter(Boolean).join(" ")}>
       {src ? (
-        <img src={src} alt="" className={`${size} rounded-full object-cover ring-2 ring-[var(--color-glass-border)]`} />
+        <Image src={src} alt="" width={40} height={40} unoptimized className={`${size} rounded-full object-cover ring-2 ring-[var(--color-glass-border)]`} />
       ) : (
         <div className={`${size} rounded-full bg-[linear-gradient(135deg,var(--color-accent),var(--color-accent-hover))] flex items-center justify-center text-white font-bold ring-2 ring-[var(--color-glass-border)]`}>{fallback || "?"}</div>
       )}

@@ -1,12 +1,4 @@
-import type {
-  User,
-  Category,
-  Task,
-  Reminder,
-  Alarm,
-  Preference,
-  DbData,
-} from "@/lib/types";
+import type { DbData, Task } from "@/lib/types";
 
 const STORAGE_KEY = "planix_db";
 const DEMO_USER_ID = "user_demo_001";
@@ -308,7 +300,7 @@ function saveDb(db: DbData) {
 }
 
 function mergeDb(seed: DbData, db: DbData): DbData {
-  const normalizedTasks = (db.tasks?.length ? db.tasks : seed.tasks).map((t) => {
+  const normalizedTasks = (db.tasks ?? seed.tasks).map((t) => {
     const base = { ...t, description: t.description ?? "", notes: t.notes ?? "", tags: Array.isArray(t.tags) ? t.tags : [], subtasks: Array.isArray(t.subtasks) ? t.subtasks : [] };
     if (base.dueDate && base.dueDate.includes("T")) {
       const d = new Date(base.dueDate);
@@ -321,10 +313,10 @@ function mergeDb(seed: DbData, db: DbData): DbData {
   return {
     user: db.user ?? seed.user,
     preferences: db.preferences ?? seed.preferences,
-    categories: db.categories?.length ? db.categories : seed.categories,
+    categories: db.categories ?? seed.categories,
     tasks: normalizedTasks,
     reminders: db.reminders ?? [],
-    alarms: db.alarms?.length ? db.alarms : seed.alarms,
+    alarms: db.alarms ?? seed.alarms,
   };
 }
 
@@ -358,4 +350,66 @@ export function generateId(prefix: string) {
 
 export function getUserId(db: DbData) {
   return db.user?.id || DEMO_USER_ID;
+}
+
+export function toggleTaskCompletion(db: DbData, taskId: string): DbData {
+  const task = db.tasks.find((item) => item.id === taskId);
+  if (!task) return db;
+
+  const completed = !task.completed;
+  const now = new Date().toISOString();
+  const tasks = db.tasks.map((item) =>
+    item.id === taskId
+      ? { ...item, completed, completedAt: completed ? now : null, updatedAt: now }
+      : item,
+  );
+
+  if (!completed || task.repeat === "none" || !task.dueDate) {
+    return { ...db, tasks };
+  }
+
+  const dueDate = task.dueDate.slice(0, 10);
+  const nextDate = new Date(`${dueDate}T12:00:00`);
+  const advance = () => {
+    if (task.repeat === "diaria") nextDate.setDate(nextDate.getDate() + 1);
+    else if (task.repeat === "semanal") nextDate.setDate(nextDate.getDate() + 7);
+    else if (task.repeat === "mensual") {
+      const dayOfMonth = task.repeatConfig?.monthDay ?? nextDate.getDate();
+      nextDate.setDate(1);
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      const lastDay = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+      nextDate.setDate(Math.min(dayOfMonth, lastDay));
+    }
+  };
+  if (task.repeat === "personalizada") return { ...db, tasks };
+  advance();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  while (nextDate.getTime() <= today.getTime()) advance();
+
+  const nextDueDate = [
+    nextDate.getFullYear(),
+    String(nextDate.getMonth() + 1).padStart(2, "0"),
+    String(nextDate.getDate()).padStart(2, "0"),
+  ].join("-");
+  const nextTask: Task = {
+    ...task,
+    id: generateId("task"),
+    dueDate: nextDueDate,
+    repeatConfig: task.repeat === "mensual"
+      ? { every: task.repeatConfig?.every ?? 1, monthDay: task.repeatConfig?.monthDay ?? Number(dueDate.slice(8, 10)) }
+      : task.repeatConfig,
+    completed: false,
+    completedAt: null,
+    favorite: false,
+    subtasks: task.subtasks.map((subtask) => ({
+      ...subtask,
+      id: generateId("st"),
+      completed: false,
+    })),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  return { ...db, tasks: [nextTask, ...tasks] };
 }

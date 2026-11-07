@@ -43,6 +43,6 @@ Al entrar se accede directamente al dashboard (sin pantalla de login). Los datos
 
 Para instalar Planix, abre **Configuración → Instalar aplicación** desde un navegador compatible y sigue la solicitud o las instrucciones que aparezcan. La instalación web requiere HTTPS en producción; en iPhone/iPad se realiza desde **Compartir → Añadir a pantalla de inicio** en Safari.
 
-## Notas importantes sobre alarmas web
+## Notas importantes sobre alarmas y recordatorios web
 
-Esta es una aplicación web. Las alarmas se implementan con `setInterval` del navegador y notificaciones/sonido vía Web Audio API. **No se garantiza que suenen con la aplicación cerrada o el dispositivo bloqueado** (limitación del navegador). En una versión móvil (React Native/Expo) se usarían notificaciones locales y APIs nativas de alarmas.
+Esta es una aplicación web. Las alarmas y los recordatorios se supervisan mientras Planix está abierta. Las alarmas usan Web Audio API y los recordatorios usan notificaciones del navegador cuando tienen permiso; si no, muestran un aviso dentro de Planix. **No se garantiza que suenen o notifiquen con la aplicación cerrada o el dispositivo bloqueado** (limitación del navegador). En una versión móvil (React Native/Expo) se usarían notificaciones locales y APIs nativas de alarmas.

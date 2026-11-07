@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/providers";
-import { generateId } from "@/lib/storage";
-import { nowIso, todayStr, isPastDue, formatTaskTime, datePart } from "@/lib/date-utils";
-import { Card, Button, Input, Badge, Label, Select, Checkbox } from "@/components/ui";
-import { Dialog } from "@/components/ui";
+import { toggleTaskCompletion } from "@/lib/storage";
+import { todayStr, isPastDue, formatTaskTime, datePart } from "@/lib/date-utils";
+import { Card, Button, Input, Badge, Label, Select } from "@/components/ui";
 import { TaskFormModal } from "@/components/TaskFormModal";
 import EmptyState from "@/components/EmptyState";
 import FAB from "@/components/FAB";
@@ -24,7 +22,6 @@ const VIEWS: { key: View; label: string }[] = [
 
 export default function TasksPage() {
   const { db, user, saveDb } = useApp();
-  const router = useRouter();
   const [view, setView] = useState<View>("todas");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -37,7 +34,10 @@ export default function TasksPage() {
   const openEdit = useCallback((id: string) => { setEditId(id); setOpen(true); }, []);
   const closeModal = useCallback(() => { setOpen(false); setEditId(null); }, []);
 
+  // Load the local date after hydration to avoid a server/client date mismatch.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { setToday(todayStr()); }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const tasks = useMemo(() => db.tasks.filter((t) => t.userId === user.id), [db, user.id]);
   const categories = db.categories.filter((c) => c.userId === user.id);
@@ -65,7 +65,7 @@ export default function TasksPage() {
   const toggleTask = useCallback((id: string) => {
     const t = db.tasks.find((x) => x.id === id);
     const completed = !t?.completed;
-    saveDb((d) => ({ ...d, tasks: d.tasks.map((x) => x.id === id ? { ...x, completed, completedAt: completed ? nowIso() : null, updatedAt: nowIso() } : x) }));
+    saveDb((d) => toggleTaskCompletion(d, id));
     showToast(completed ? "Tarea completada" : "Tarea reabierta", "success");
   }, [db, saveDb, showToast]);
 

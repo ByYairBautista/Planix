@@ -7,6 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import { Avatar } from "@/components/ui";
 import { PWAInstallProvider } from "@/components/InstallAppPrompt";
+import AppSchedulers from "@/components/AppSchedulers";
 
 function MobileHeader() {
   const { user, theme, setTheme } = useApp();
@@ -54,6 +55,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           </Suspense>
         </div>
         <ToastContainer />
+        <AppSchedulers />
       </PWAInstallProvider>
     </AppProvider>
   );

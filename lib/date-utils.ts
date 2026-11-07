@@ -53,7 +53,7 @@ export function formatTime(isoOrTime: string, timeFormat: 12 | 24 = 24) {
   // Entrada HH:mm o HH:mm:ss
   const hm = String(isoOrTime).match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (hm) {
-    let h = Number(hm[1]);
+    const h = Number(hm[1]);
     const min = hm[2];
     if (timeFormat === 12) {
       const suffix = h >= 12 ? "p. m." : "a. m.";
@@ -143,4 +143,22 @@ export function getMonthDays(year: number, month: number) {
 export function parseHHmm(t: string) {
   const [h, m] = t.split(":").map(Number);
   return { h, m };
+}
+
+export function nextReminderOccurrence(
+  datetime: string,
+  repeat: "diaria" | "semanal" | "mensual",
+  monthlyDay?: number,
+): string {
+  const next = new Date(datetime);
+  const dayOfMonth = monthlyDay ?? next.getDate();
+  if (repeat === "diaria") next.setDate(next.getDate() + 1);
+  else if (repeat === "semanal") next.setDate(next.getDate() + 7);
+  else {
+    next.setDate(1);
+    next.setMonth(next.getMonth() + 1);
+    const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+    next.setDate(Math.min(dayOfMonth, lastDay));
+  }
+  return next.toISOString();
 }

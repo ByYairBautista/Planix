@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "@/lib/providers";
 import { isPastDue, todayStr } from "@/lib/date-utils";
 import { Card, StatBadge } from "@/components/ui";
@@ -10,7 +10,10 @@ export default function StatsPage() {
   const tasks = db.tasks.filter((t) => t.userId === user.id);
   const [today, setToday] = useState("");
 
+  // Load date-derived values after hydration to avoid server/client date mismatches.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { setToday(todayStr()); }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const completed = tasks.filter((t) => t.completed);
   const pending = tasks.filter((t) => !t.completed);
@@ -24,6 +27,7 @@ export default function StatsPage() {
   const catActivity = categories.map((c) => ({ name: c.name, color: c.color, count: catCounts[c.id] || 0 })).filter((c) => c.count > 0).sort((a, b) => b.count - a.count).slice(0, 5);
 
   const [last7, setLast7] = useState<string[]>([]);
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const arr: string[] = [];
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -33,6 +37,7 @@ export default function StatsPage() {
     }
     setLast7(arr);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const streakDays = last7.filter((ds) =>
     completed.some((t) => t.completedAt && t.completedAt.slice(0, 10) === ds)
